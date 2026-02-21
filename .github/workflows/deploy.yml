@@ -1,0 +1,69 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  # ── 1. Chạy tests ───────────────────────────────────────────────────────────
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Build test image (client)
+        run: docker build -t huyhieu9301/react-test -f ./client/Dockerfile.dev ./client
+
+      - name: Run tests
+        run: docker run -e CI=true huyhieu9301/react-test npm test
+
+  # ── 2. Build & Push production images ────────────────────────────────────────
+  build-and-push:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build production images
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/complex-client  ./client
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/complex-nginx    ./nginx
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/complex-server   ./server
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/complex-worker   ./worker
+
+      - name: Push images to Docker Hub
+        run: |
+          docker push ${{ secrets.DOCKER_USERNAME }}/complex-client
+          docker push ${{ secrets.DOCKER_USERNAME }}/complex-nginx
+          docker push ${{ secrets.DOCKER_USERNAME }}/complex-server
+          docker push ${{ secrets.DOCKER_USERNAME }}/complex-worker
+
+  # ── 3. Deploy lên AWS Elastic Beanstalk ──────────────────────────────────────
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Generate deploy package
+        run: |
+          cp docker-compose.prod.yml docker-compose.yml
+          zip deploy.zip docker-compose.yml
+
+      - name: Deploy to AWS Elastic Beanstalk
+        uses: einaregilsson/beanstalk-deploy@v21
+        with:
+          aws_access_key: ${{ secrets.AWS_ACCESS_KEY }}
+          aws_secret_key: ${{ secrets.AWS_SECRET_KEY }}
+          application_name: multi-docker          # ← đổi thành tên EB app của bạn
+          environment_name: multi-docker-env      # ← đổi thành tên EB env của bạn
+          version_label: ${{ github.sha }}
+          region: us-east-1
+          deployment_package: deploy.zip
