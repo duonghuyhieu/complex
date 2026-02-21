@@ -32,6 +32,11 @@ class Fib extends Component {
       index: this.state.index,
     });
     this.setState({ index: '' });
+
+    setTimeout(() => {
+      this.fetchValues();
+      this.fetchIndexes();
+    }, 500);
   };
 
   renderSeenIndexes() {
