@@ -2,9 +2,8 @@ version: '3'
 services:
   client:
     image: huyhieu9301/complex-client
-  server:
+  api:
     image: huyhieu9301/complex-server
-    hostname: api
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -26,5 +25,10 @@ services:
     image: postgres:latest
     environment:
       - POSTGRES_PASSWORD=postgres_password
+    volumes:
+      - pgdata:/var/lib/postgresql/data
   redis:
     image: redis:latest
+
+volumes:
+  pgdata:
